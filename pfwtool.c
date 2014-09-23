@@ -82,7 +82,6 @@ static size_t load_file(void **res, const char *path)
 {
 	FILE *fp = NULL;
 	struct stat st;
-	void *ptr;
 
 	if (stat(path, &st) != 0)
 		return 0;
