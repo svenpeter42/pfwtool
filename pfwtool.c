@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
 		g_endian = ENDIAN_LITTLE;
 		deobfuscate(in, 0, 0x100, 0, 0x100);
 		deobfuscate(in, 0, 0x100, 0x200, 0x1000000 - 0x200);
-		//deobfuscate(in, 0x1000000, 0, 0x80, in_size - 0x1000000 - 0x70);
+		deobfuscate(in, 0x1000000, 0, 0x80, in_size - 0x1000000 - 0x80);
 	} else {
 		fprintf(stderr, "Unknown input file.\n");
 		return -1;
