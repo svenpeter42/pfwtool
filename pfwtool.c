@@ -7,6 +7,29 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#define ENDIAN_BIG	0
+#define ENDIAN_LITTLE	1
+static unsigned int g_endian = ENDIAN_BIG;
+
+static unsigned int le32(const uint8_t *ptr)
+{
+	unsigned int res = 0;
+	res |= ptr[3] << 24;
+	res |= ptr[2] << 16;
+	res |= ptr[1] <<  8;
+	res |= ptr[0];
+
+	return res;
+}
+
+static void wle32(uint8_t *ptr, uint32_t v)
+{
+	ptr[3] = v >> 24;
+	ptr[2] = v >> 16;
+	ptr[1] = v >>  8;
+	ptr[0] = v;
+}
+
 static unsigned int be32(const uint8_t *ptr)
 {
 	unsigned int res = 0;
@@ -26,12 +49,28 @@ static void wbe32(uint8_t *ptr, uint32_t v)
 	ptr[3] = v;
 }
 
+static unsigned int read32(const uint8_t *ptr)
+{
+	if (g_endian == ENDIAN_LITTLE)
+		return le32(ptr);
+	else
+		return be32(ptr);
+}
+
+static void write32(uint8_t *ptr, uint32_t v)
+{
+	if (g_endian == ENDIAN_LITTLE)
+		return wle32(ptr, v);
+	else
+		return wbe32(ptr, v);
+}
+
 static void load_iv(const uint8_t *ptr, uint32_t *iv)
 {
-	iv[0] = be32(ptr);
-	iv[1] = be32(ptr + 4);
-	iv[2] = be32(ptr + 8);
-	iv[3] = be32(ptr + 12);
+	iv[0] = read32(ptr);
+	iv[1] = read32(ptr + 4);
+	iv[2] = read32(ptr + 8);
+	iv[3] = read32(ptr + 12);
 }
 
 static void calculate_key(const uint32_t *iv, uint32_t *key)
@@ -68,9 +107,9 @@ static int mangle_blocks(off_t offset, size_t len, const void *in, void *out, co
 
 	while (blocks--) {
 		for (unsigned int i = 0; i < 0x20; ++i) {
-			word = be32(in + offset + 4*i);
+			word = read32(in + offset + 4*i);
 			word ^= fullkey[i] - offset;
-			wbe32(out + offset + 4*i, word);
+			write32(out + offset + 4*i, word);
 		}
 		offset += 0x80;
 	}
@@ -130,12 +169,19 @@ int main(int argc, char *argv[])
 	}
 
 	if (strncmp((char *)in + 0x24, "Copyright", 9) == 0) {
+		g_endian = ENDIAN_BIG;
 		deobfuscate(in, 0, 0, 0x100, 0x0a00000 - 0x100);
 		deobfuscate(in, 0x0a00000, 0, 0x100, 0x80000 - 0x100);
 	} else if(strncmp((char *)in + 0xf24, "Copyright", 9) == 0) {
+		g_endian = ENDIAN_BIG;
 		deobfuscate(in, 0, 0xf00, 0, 0xf00);
 		deobfuscate(in, 0, 0xf00, 0x1000, 0xc00000 - 0x1000);
 		deobfuscate(in, 0xc00000, 0x3ff80, 0, 0x3ff80);
+	} else if(strncmp((char *)in + 0x124, "Copyright", 9) == 0) {
+		g_endian = ENDIAN_LITTLE;
+		deobfuscate(in, 0, 0x100, 0, 0x100);
+		deobfuscate(in, 0, 0x100, 0x200, 0x1000000 - 0x200);
+		//deobfuscate(in, 0x1000000, 0, 0x80, in_size - 0x1000000 - 0x70);
 	} else {
 		fprintf(stderr, "Unknown input file.\n");
 		return -1;
