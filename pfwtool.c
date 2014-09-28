@@ -65,6 +65,11 @@ static void write32(uint8_t *ptr, uint32_t v)
 		return wbe32(ptr, v);
 }
 
+static void xor32(uint8_t *ptr, uint32_t v)
+{
+	write32(ptr, read32(ptr) ^ v);
+}
+
 static void load_iv(const uint8_t *ptr, uint32_t *iv)
 {
 	iv[0] = read32(ptr);
@@ -76,8 +81,6 @@ static void load_iv(const uint8_t *ptr, uint32_t *iv)
 static void calculate_key(const uint32_t *iv, uint32_t *key)
 {
 	uint32_t tmp[4];
-
-	memset(key, 0, 0x80);
 
 	tmp[0] = iv[0] + ~iv[2];
 	tmp[1] = iv[1] + ~iv[3];
@@ -92,10 +95,9 @@ static void calculate_key(const uint32_t *iv, uint32_t *key)
 	}
 }
 
-static int mangle_blocks(off_t offset, size_t len, const void *in, void *out, const uint32_t *fullkey)
+static int mangle_blocks(off_t offset, size_t len, void *bfr, const uint32_t *fullkey)
 {
 	uint32_t blocks;
-	uint32_t word;
 
 	if (offset % 0x80)
 		return -1;
@@ -106,11 +108,8 @@ static int mangle_blocks(off_t offset, size_t len, const void *in, void *out, co
 	blocks = len / 0x80;
 
 	while (blocks--) {
-		for (unsigned int i = 0; i < 0x20; ++i) {
-			word = read32(in + offset + 4*i);
-			word ^= fullkey[i] - offset;
-			write32(out + offset + 4*i, word);
-		}
+		for (unsigned int i = 0; i < 0x20; ++i)
+			xor32(bfr + offset + 4*i, fullkey[i] - offset);
 		offset += 0x80;
 	}
 
@@ -133,7 +132,9 @@ static size_t load_file(void **res, const char *path)
 	if (!*res)
 		return 0;
 
-	fread(*res, st.st_size, 1, fp);
+	if (fread(*res, st.st_size, 1, fp) != 1)
+		return 0;
+
 	fclose(fp);
 
 	return st.st_size;
@@ -150,7 +151,10 @@ static void deobfuscate(void *bfr, off_t off_base, off_t off_iv, off_t off_start
 	load_iv(ptr + off_iv, iv);
 	calculate_key(iv, key);
 
-	mangle_blocks(off_start, len, ptr, ptr, key);
+	if (mangle_blocks(off_start, len, ptr, key) < 0) {
+		fprintf(stderr, "mangle_blocks failed.\n");
+		exit(-1);
+	}
 }
 
 int main(int argc, char *argv[])
