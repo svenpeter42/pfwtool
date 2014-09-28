@@ -1,2 +1,2 @@
-pfwtool: pfwtool.c
-	$(CC) -W -Wall -std=c99 -o pfwtool pfwtool.c
+ptxfwtool: ptxfwtool.c
+	$(CC) -W -Wall -std=c99 -o $@ $<
