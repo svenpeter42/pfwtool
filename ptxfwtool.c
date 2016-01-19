@@ -184,98 +184,100 @@ static void deobfuscate(void *bfr, off_t off_base, off_t off_iv, off_t off_start
 
 static size_t decompress(uint8_t *out, size_t out_len, uint8_t *in, size_t in_offs, size_t in_len, int subtype)
 {
-    uint8_t *pend_in = in+in_len+in_offs;
-    uint8_t *pstart_out = out;
-    uint8_t *pend;
-    int map, mask;
-    int blk_len;
+	uint8_t *pend_in = in + in_len + in_offs;
+	uint8_t *pstart_out = out;
+	uint8_t *pend;
+	int map, mask;
+	int blk_len;
 
-    in += in_offs;
-    for (;;) {
-        if (out>=pstart_out+out_len) {
-            printf ("!!! Missing stream end\n");
-            break;
-        }
+	in += in_offs;
+	for (;;) {
+	if (out >= pstart_out + out_len) {
+		printf("!!! Missing stream end\n");
+		break;
+	}
 
-        blk_len = be16(in);
-        in += 2;
-        #ifdef DEBUG
-            printf("Blk:%08X len:%04X\n", in-(pend_in-in_len)-2+in_offs, blk_len);
-        #endif
+	blk_len = be16(in);
+	in += 2;
+#ifdef DEBUG
+	printf("Blk:%p len:%04X\n", in - (pend_in - in_len) - 2 + in_offs, blk_len);
+#endif
 
-        // end of stream
-        if (blk_len==0)
-            break;
+	// end of stream
+	if (blk_len == 0)
+		break;
 
-        if (blk_len==0xE000) { // special case
-            blk_len = (subtype ? 0x6000 : 0xC002);
-        } else if (blk_len>0x8000) {
-            printf ("!!! incorrect block length\n");
-            break;
-        }
-        if (in+blk_len+2+2>pend_in) {
-            printf ("!!! input block is not complete\n");
-            break;
-        }
+	if (blk_len == 0xE000) { // special case
+		blk_len = (subtype ? 0x6000 : 0xC002);
+	} else if (blk_len > 0x8000) {
+		printf("!!! incorrect block length\n");
+		break;
+	}
+	if (in + blk_len + 2 + 2 > pend_in) {
+		printf("!!! input block is not complete\n");
+		break;
+	}
 
-        if (blk_len==0xC002 && subtype==0) { // raw block type 0
-            // copy and restart
-            memcpy(out, in, blk_len-2);
-            // TODO what are last two bytes of such block (not zero) ?
-            out += (blk_len-2);
-            in += blk_len;
-            continue;
-        } else if (blk_len==0x6000 && subtype) { // raw block type 1
-            memcpy(out, in, blk_len);
-            out += blk_len;
-            in += blk_len;
-            continue;
-        }
-        // method appears based on LZRW-1A with different extendable length
-        mask = 0;
-        for (pend = in + blk_len-2; in<pend; ) {
-            if (!mask) {
-                map = be16(in);
-                in += 2;
-                mask = 0x8000;
-                #ifdef DEBUG
-                    printf("  Map %04X\n", map);
-                #endif
-            } else {
-                if (map & mask) { // COPY
-                    int len = (in[0] & 7) + 3;
-                    int offs = ((in[0]&0xF8)<<5) | in[1];
-                    in += 2;
-                    // extended "length" field
-                    if (len==10)
-                        do {
-                            len += *in;
-                        } while (*(in++)==0xFF);
-                    #ifdef DEBUG
-                        printf("  Mask %04X len:%d offs:%X I:%08X, O:%08X\n", mask, len, offs, in-(pend_in-in_len)+in_offs, out-pstart_out);
-                    #endif
-                    if (offs==0){
-                        printf ("!!! Zero offset\n");
-                        break;
-                    }
+	if (blk_len == 0xC002 && subtype == 0) { // raw block type 0
+		// copy and restart
+		memcpy(out, in, blk_len - 2);
+		// TODO what are last two bytes of such block (not zero) ?
+		out += (blk_len - 2);
+		in += blk_len;
+		continue;
+	} else if (blk_len == 0x6000 && subtype) { // raw block type 1
+		memcpy(out, in, blk_len);
+		out += blk_len;
+		in += blk_len;
+		continue;
+	}
+	// method appears based on LZRW-1A with different extendable length
+	mask = 0;
+	for (pend = in + blk_len - 2; in < pend;) {
+		if (!mask) {
+			map = be16(in);
+			in += 2;
+			mask = 0x8000;
+#ifdef DEBUG
+			printf("  Map %04X\n", map);
+#endif
+		} else {
+			if (map & mask) {	// COPY
+				int len = (in[0] & 7) + 3;
+				int offs = ((in[0] & 0xF8) << 5) | in[1];
+				in += 2;
+				// extended "length" field
+				if (len == 10)
+				do {
+					len += *in;
+				} while (*(in++) == 0xFF);
+#ifdef DEBUG
+				printf("  Mask %04X len:%d offs:%X I:%p, O:%p\n",
+					mask, len, offs, in - (pend_in - in_len) + in_offs, out - pstart_out);
+#endif
+				if (offs == 0) {
+					printf("!!! Zero offset\n");
+					break;
+				}
 
-                    while ((len--)>0) {
-                        *out = *(out-offs);
-                        out++;
-                    }
-                } else // LITERAL
-                    *(out++) = *(in++);
-                mask>>=1;
-            }
-        }
-        // trailer
-        if (be16(in)!=0) {
-            printf ("!!! Missing block end\n");
-            break;
-        }
-        in += 2;
-    }
-    return (out-pstart_out);
+				while ((len--) > 0) {
+					*out = *(out - offs);
+					out++;
+				}
+			} else {	// LITERAL
+				*(out++) = *(in++);
+			}
+			mask >>= 1;
+		}
+	}
+	// trailer
+	if (be16(in) != 0) {
+		printf("!!! Missing block end\n");
+		break;
+	}
+	in += 2;
+	}
+	return (out - pstart_out);
 }
 
 int main(int argc, char *argv[])
@@ -300,11 +302,12 @@ int main(int argc, char *argv[])
 		g_endian = ENDIAN_BIG;
 		deobfuscate(in, 0, 0, 0x100, 0x0a00000 - 0x100);
 		deobfuscate(in, 0x0a00000, 0, 0x100, 0x80000 - 0x100);
-	} else if(strncmp((char *)in + 0xf24, "Copyright", 9) == 0 && (in_size==0xc00000 || in_size==0xC40000)) {
+	} else if(strncmp((char *)in + 0xf24, "Copyright", 9) == 0
+		&& (in_size == 0xc00000 || in_size == 0xC40000)) {
 		g_endian = ENDIAN_BIG;
 		deobfuscate(in, 0, 0xf00, 0, 0xf00);
 		deobfuscate(in, 0, 0xf00, 0x1000, 0xc00000 - 0x1000);
-        if (in_size>=0xc3ff80)
+        if (in_size >= 0xc3ff80)
     		deobfuscate(in, 0xc00000, 0x3ff80, 0, 0x3ff80);
 	} else if(strncmp((char *)in + 0x124, "Copyright", 9) == 0) {
 		g_endian = ENDIAN_LITTLE;
@@ -329,7 +332,7 @@ int main(int argc, char *argv[])
     		fprintf(stderr, "!!! wrong checksum: %08X, expected 0\n", sum);
     		return -1;
 	    }
-	    if (le16(in+0x1F6)==0) {
+	    if (le16(in + 0x1F6) == 0) {
     		fprintf(stderr, "!!! not compressed\n");
     		return -1;
 	    }
@@ -338,7 +341,7 @@ int main(int argc, char *argv[])
 	    memset (out, 0, out_size);
 	    /* limit is a position of resource files (0x00800000)
 	       0x005FFFFF is empirical limit for minimum of debug output in bad case */
-		out_size = decompress((uint8_t*)out, out_size, in, 0x200, min(in_size,0x005FFFFF), subtype);
+		out_size = decompress((uint8_t*)out, out_size, in, 0x200, min(in_size, 0x005FFFFF), subtype);
 		free(in);
 		in = NULL;
 	} else {
