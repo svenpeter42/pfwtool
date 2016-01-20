@@ -16,7 +16,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define noDEBUG
+//  Uncomment the line to enable debug info
+//#define DEBUG
 
 #define ENDIAN_BIG	0
 #define ENDIAN_LITTLE	1
