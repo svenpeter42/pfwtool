@@ -27,7 +27,10 @@ static unsigned int g_endian = ENDIAN_BIG;
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-static unsigned int le16(const uint8_t *ptr) { return (ptr[1] << 8) | ptr[0]; }
+static unsigned int le16(const uint8_t *ptr)
+{
+	return (ptr[1] << 8) | ptr[0];
+}
 static unsigned int le32(const uint8_t *ptr)
 {
 	unsigned int res = 0;
@@ -47,7 +50,10 @@ static void wle32(uint8_t *ptr, uint32_t v)
 	ptr[0] = v;
 }
 
-static unsigned int be16(const uint8_t *ptr) { return (ptr[0] << 8) | ptr[1]; }
+static unsigned int be16(const uint8_t *ptr)
+{
+	return (ptr[0] << 8) | ptr[1];
+}
 static unsigned int be32(const uint8_t *ptr)
 {
 	unsigned int res = 0;
@@ -83,7 +89,10 @@ static void write32(uint8_t *ptr, uint32_t v)
 		return wbe32(ptr, v);
 }
 
-static void xor32(uint8_t *ptr, uint32_t v) { write32(ptr, read32(ptr) ^ v); }
+static void xor32(uint8_t *ptr, uint32_t v)
+{
+	write32(ptr, read32(ptr) ^ v);
+}
 static void load_iv(const uint8_t *ptr, uint32_t *iv)
 {
 	iv[0] = read32(ptr);
